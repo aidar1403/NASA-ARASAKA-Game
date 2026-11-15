@@ -1,4 +1,3 @@
-
 import json
 import socketserver
 import threading
@@ -45,6 +44,7 @@ SCENARIOS = {
             "hull_integrity": -3,
             "temperature": 2
         },
+        "crew_delta": {"health": -8, "heart_rate": 12},
         "modules": {"life_support": "DAMAGED"},
         "choices": [
             {
@@ -53,6 +53,7 @@ SCENARIOS = {
                     "oxygen": 4, "energy": -12,
                     "hull_integrity": 0, "temperature": -1
                 },
+                "crew_delta": {"health": -2, "heart_rate": 3},
                 "modules": {"life_support": "DAMAGED"},
                 "outcome": (
                     "The crew reached the shielded compartment. "
@@ -66,6 +67,7 @@ SCENARIOS = {
                     "oxygen": -18, "energy": 8,
                     "hull_integrity": 0, "temperature": 1
                 },
+                "crew_delta": {"health": -20, "heart_rate": 25},
                 "modules": {"life_support": "OFFLINE"},
                 "outcome": (
                     "Power was conserved, but shutting down life "
@@ -79,6 +81,7 @@ SCENARIOS = {
                     "oxygen": -25, "energy": -5,
                     "hull_integrity": -8, "temperature": 2
                 },
+                "crew_delta": {"health": -25, "heart_rate": 30},
                 "modules": {
                     "life_support": "OFFLINE",
                     "navigation": "DAMAGED"
@@ -111,6 +114,7 @@ SCENARIOS = {
             "hull_integrity": -4,
             "temperature": 3
         },
+        "crew_delta": {"health": -3, "heart_rate": 5},
         "modules": {"communications": "DAMAGED"},
         "choices": [
             {
@@ -119,6 +123,7 @@ SCENARIOS = {
                     "oxygen": 0, "energy": -8,
                     "hull_integrity": 0, "temperature": -1
                 },
+                "crew_delta": {"health": -1, "heart_rate": 2},
                 "modules": {"communications": "ONLINE"},
                 "outcome": (
                     "The backup antenna restored a stable link. "
@@ -132,6 +137,7 @@ SCENARIOS = {
                     "oxygen": 0, "energy": 5,
                     "hull_integrity": 0, "temperature": 1
                 },
+                "crew_delta": {"health": -5, "heart_rate": 8},
                 "modules": {
                     "navigation": "OFFLINE",
                     "communications": "DAMAGED"
@@ -148,6 +154,7 @@ SCENARIOS = {
                     "oxygen": -3, "energy": -10,
                     "hull_integrity": -8, "temperature": 3
                 },
+                "crew_delta": {"health": -12, "heart_rate": 15},
                 "modules": {"communications": "OFFLINE"},
                 "outcome": (
                     "The crew continued without telemetry. A secondary "
@@ -176,6 +183,7 @@ SCENARIOS = {
             "hull_integrity": -2,
             "temperature": 5
         },
+        "crew_delta": {"health": -15, "heart_rate": 20},
         "modules": {"life_support": "DAMAGED"},
         "choices": [
             {
@@ -184,6 +192,7 @@ SCENARIOS = {
                     "oxygen": -2, "energy": -8,
                     "hull_integrity": 0, "temperature": -2
                 },
+                "crew_delta": {"health": -3, "heart_rate": 5},
                 "modules": {"life_support": "DAMAGED"},
                 "outcome": (
                     "The crew entered the storm shelter and exposure "
@@ -197,6 +206,7 @@ SCENARIOS = {
                     "oxygen": -8, "energy": -5,
                     "hull_integrity": -10, "temperature": 2
                 },
+                "crew_delta": {"health": -30, "heart_rate": 35},
                 "modules": {
                     "life_support": "DAMAGED",
                     "navigation": "DAMAGED"
@@ -213,6 +223,7 @@ SCENARIOS = {
                     "oxygen": -5, "energy": 3,
                     "hull_integrity": 0, "temperature": 2
                 },
+                "crew_delta": {"health": -10, "heart_rate": 12},
                 "modules": {"communications": "DAMAGED"},
                 "outcome": (
                     "The warning instruments stopped reporting. "
@@ -242,6 +253,7 @@ SCENARIOS = {
             "hull_integrity": -5,
             "temperature": 3
         },
+        "crew_delta": {"health": -5, "heart_rate": 10},
         "modules": {"engine": "DAMAGED"},
         "choices": [
             {
@@ -250,6 +262,7 @@ SCENARIOS = {
                     "oxygen": 0, "energy": 8,
                     "hull_integrity": 0, "temperature": -1
                 },
+                "crew_delta": {"health": -2, "heart_rate": 3},
                 "modules": {
                     "engine": "DAMAGED",
                     "navigation": "ONLINE"
@@ -266,6 +279,7 @@ SCENARIOS = {
                     "oxygen": 0, "energy": -20,
                     "hull_integrity": 0, "temperature": 2
                 },
+                "crew_delta": {"health": -10, "heart_rate": 15},
                 "modules": {
                     "engine": "DAMAGED",
                     "navigation": "DAMAGED"
@@ -282,6 +296,7 @@ SCENARIOS = {
                     "oxygen": -2, "energy": -12,
                     "hull_integrity": -15, "temperature": 4
                 },
+                "crew_delta": {"health": -25, "heart_rate": 30},
                 "modules": {
                     "engine": "OFFLINE",
                     "navigation": "OFFLINE"
@@ -419,6 +434,8 @@ class MissionServer(socketserver.ThreadingTCPServer):
     def send_alert(self, message, level="WARNING", target=None):
         packet = {
             "type": "ALERT",
+            "message": message,
+            "level": level,
             "data": {
                 "message": message,
                 "level": level
@@ -462,11 +479,14 @@ class MissionServer(socketserver.ThreadingTCPServer):
             self.game_over = True
             self.game_over_reason = reason
 
+        reason_msg = self.get_game_over_message(reason)
         self.broadcast({
             "type": "GAME_OVER",
+            "reason": reason,
+            "message": reason_msg,
             "data": {
                 "reason": reason,
-                "message": self.get_game_over_message(reason)
+                "message": reason_msg
             }
         })
 
@@ -529,7 +549,6 @@ class MissionServer(socketserver.ThreadingTCPServer):
             return
 
         with self.state_lock:
-            # A new scenario starts a fresh simulation.
             self.ship.reset()
 
             self.pending_order = None
@@ -538,6 +557,7 @@ class MissionServer(socketserver.ThreadingTCPServer):
             self.ship.start_scenario(scenario_id)
 
             self.apply_delta(scenario["initial"])
+            self.ship.apply_crew_delta(scenario.get("crew_delta"))
 
             for module, status in scenario["modules"].items():
                 self.ship.set_module_status(module, status)
@@ -549,7 +569,6 @@ class MissionServer(socketserver.ThreadingTCPServer):
             scenario["level"]
         )
 
-        # Crew receives an additional operational instruction.
         self.send_to_role("onboard_commander", {
             "type": "SCENARIO_ALERT",
             "data": {
@@ -605,6 +624,7 @@ class MissionServer(socketserver.ThreadingTCPServer):
             choice = scenario["choices"][choice_index]
 
             self.apply_delta(choice["delta"])
+            self.ship.apply_crew_delta(choice.get("crew_delta"))
 
             for module, status in choice.get("modules", {}).items():
                 self.ship.set_module_status(module, status)
@@ -624,7 +644,11 @@ class MissionServer(socketserver.ThreadingTCPServer):
 
         self.broadcast({
             "type": "SCENARIO_OUTCOME",
-            "data": result
+            "data": {
+                **result,
+                "crew": self.ship.get_crew_status(),
+                "telemetry": self.ship.get_status()
+            }
         })
 
         self.send_alert(
@@ -653,6 +677,7 @@ class MissionServer(socketserver.ThreadingTCPServer):
 
         self.broadcast({
             "type": "EVENT",
+            "message": result.get("message", "Event"),
             "data": result
         })
 
@@ -679,6 +704,7 @@ class MissionServer(socketserver.ThreadingTCPServer):
             order = {
                 "order_id": str(uuid.uuid4()),
                 "module": module,
+                "action": f"CHECK {module.replace('_', ' ').upper()}",
                 "status": "PENDING"
             }
 
@@ -727,6 +753,7 @@ class MissionServer(socketserver.ThreadingTCPServer):
 
         self.broadcast({
             "type": "ACTION_RESULT",
+            "message": result["message"],
             "data": result
         })
 
@@ -793,9 +820,11 @@ class MissionServer(socketserver.ThreadingTCPServer):
             return
 
         approved = bool(approved)
+        verdict = "approved" if approved else "rejected"
 
         self.broadcast({
             "type": "PROPOSAL_RESPONSE",
+            "message": f"Proposal {verdict}: {proposal['text'][:120]}",
             "data": {
                 "proposal_id": proposal_id,
                 "approved": approved,
@@ -903,14 +932,13 @@ class ClientHandler(socketserver.StreamRequestHandler):
         self.server.send_telemetry()
 
         if self.server.game_over:
+            reason = self.server.game_over_reason
+            msg = self.server.get_game_over_message(reason)
             self.server.send_to_client(self, {
                 "type": "GAME_OVER",
-                "data": {
-                    "reason": self.server.game_over_reason,
-                    "message": self.server.get_game_over_message(
-                        self.server.game_over_reason
-                    )
-                }
+                "reason": reason,
+                "message": msg,
+                "data": {"reason": reason, "message": msg}
             })
 
         with self.server.state_lock:

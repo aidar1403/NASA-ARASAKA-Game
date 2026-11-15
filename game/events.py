@@ -1,14 +1,6 @@
-
 def asteroid_collision(ship):
     """
     Событие столкновения с астероидом.
-
-    Последствия:
-    - повреждение корпуса;
-    - потеря энергии;
-    - повреждение системы жизнеобеспечения;
-    - изменение температуры;
-    - ухудшение состояния экипажа.
     """
 
     print("\n!!! ASTEROID COLLISION !!!")
@@ -17,15 +9,8 @@ def asteroid_collision(ship):
     ship.consume_energy(15)
     ship.change_temperature(5)
 
-    ship.set_module_status(
-        "life_support",
-        "DAMAGED"
-    )
-
-    ship.set_module_status(
-        "navigation",
-        "DAMAGED"
-    )
+    ship.set_module_status("life_support", "DAMAGED")
+    ship.set_module_status("navigation", "DAMAGED")
 
     ship.update_crew_environment()
 
@@ -41,11 +26,10 @@ def asteroid_collision(ship):
             "hull_damage": 25,
             "energy_loss": 15,
             "temperature_change": 5,
-            "damaged_modules": [
-                "life_support",
-                "navigation"
-            ]
-        }
+            "damaged_modules": ["life_support", "navigation"]
+        },
+        "crew": ship.get_crew_status(),
+        "telemetry": ship.get_status()
     }
 
 
@@ -55,6 +39,8 @@ def solar_flare(ship):
     ship.consume_energy(15)
     ship.set_module_status("communications", "DAMAGED")
     ship.change_temperature(3)
+    ship.apply_crew_delta({"health": -5, "heart_rate": 8})
+    ship.update_crew_environment()
 
     return {
         "event": "SOLAR_FLARE",
@@ -63,7 +49,9 @@ def solar_flare(ship):
             "energy_loss": 15,
             "temperature_change": 3,
             "damaged_modules": ["communications"]
-        }
+        },
+        "crew": ship.get_crew_status(),
+        "telemetry": ship.get_status()
     }
 
 
@@ -78,6 +66,7 @@ def radiation_exposure(ship):
         )
 
     ship.consume_energy(10)
+    ship.update_crew_environment()
 
     return {
         "event": "RADIATION_EXPOSURE",
@@ -85,7 +74,9 @@ def radiation_exposure(ship):
         "effects": {
             "crew_health_loss": 10,
             "energy_loss": 10
-        }
+        },
+        "crew": ship.get_crew_status(),
+        "telemetry": ship.get_status()
     }
 
 
@@ -102,6 +93,8 @@ def solar_particle_event(ship):
             ship.crew[member_id]["heart_rate"] + 20
         )
 
+    ship.update_crew_environment()
+
     return {
         "event": "SOLAR_PARTICLE_EVENT",
         "message": "Solar particle event detected! Crew exposure risk!",
@@ -109,7 +102,9 @@ def solar_particle_event(ship):
             "energy_loss": 20,
             "temperature_change": 5,
             "crew_health_loss": 15
-        }
+        },
+        "crew": ship.get_crew_status(),
+        "telemetry": ship.get_status()
     }
 
 
@@ -119,6 +114,8 @@ def coronal_mass_ejection(ship):
     ship.consume_energy(25)
     ship.change_temperature(8)
     ship.set_module_status("navigation", "DAMAGED")
+    ship.apply_crew_delta({"health": -5, "heart_rate": 10})
+    ship.update_crew_environment()
 
     return {
         "event": "CORONAL_MASS_EJECTION",
@@ -127,5 +124,7 @@ def coronal_mass_ejection(ship):
             "energy_loss": 25,
             "temperature_change": 8,
             "damaged_modules": ["navigation"]
-        }
+        },
+        "crew": ship.get_crew_status(),
+        "telemetry": ship.get_status()
     }

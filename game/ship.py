@@ -1,4 +1,3 @@
-
 class Spaceship:
     """Единое серверное состояние корабля и экипажа."""
 
@@ -42,7 +41,6 @@ class Spaceship:
             }
         }
 
-        # Текущий игровой сценарий
         self.current_scenario = None
         self.scenario_completed = False
 
@@ -59,8 +57,6 @@ class Spaceship:
     # =====================================
 
     def get_status(self):
-        """Публичная телеметрия корабля."""
-
         return {
             "oxygen": self.oxygen,
             "energy": self.energy,
@@ -72,8 +68,6 @@ class Spaceship:
         }
 
     def get_crew_status(self):
-        """Приватные показатели экипажа."""
-
         return {
             member_id: member.copy()
             for member_id, member in self.crew.items()
@@ -86,7 +80,6 @@ class Spaceship:
     def damage_hull(self, amount):
         if amount < 0:
             raise ValueError("Damage cannot be negative")
-
         self.hull_integrity = self.clamp(
             self.hull_integrity - amount, 0, 100
         )
@@ -94,44 +87,29 @@ class Spaceship:
     def consume_energy(self, amount):
         if amount < 0:
             raise ValueError("Energy consumption cannot be negative")
-
-        self.energy = self.clamp(
-            self.energy - amount, 0, 100
-        )
+        self.energy = self.clamp(self.energy - amount, 0, 100)
 
     def consume_oxygen(self, amount):
         if amount < 0:
             raise ValueError("Oxygen consumption cannot be negative")
-
-        self.oxygen = self.clamp(
-            self.oxygen - amount, 0, 100
-        )
+        self.oxygen = self.clamp(self.oxygen - amount, 0, 100)
 
     def change_temperature(self, amount):
-        self.temperature = self.clamp(
-            self.temperature + amount, -100, 100
-        )
+        self.temperature = self.clamp(self.temperature + amount, -100, 100)
 
     def restore_oxygen(self, amount):
         if amount < 0:
             raise ValueError("Restoration cannot be negative")
-
-        self.oxygen = self.clamp(
-            self.oxygen + amount, 0, 100
-        )
+        self.oxygen = self.clamp(self.oxygen + amount, 0, 100)
 
     def restore_energy(self, amount):
         if amount < 0:
             raise ValueError("Restoration cannot be negative")
-
-        self.energy = self.clamp(
-            self.energy + amount, 0, 100
-        )
+        self.energy = self.clamp(self.energy + amount, 0, 100)
 
     def repair_hull(self, amount):
         if amount < 0:
             raise ValueError("Repair cannot be negative")
-
         self.hull_integrity = self.clamp(
             self.hull_integrity + amount, 0, 100
         )
@@ -143,12 +121,8 @@ class Spaceship:
     def set_module_status(self, module_name, status):
         if module_name not in self.modules:
             raise ValueError(f"Unknown module: {module_name}")
-
-        allowed_statuses = ("ONLINE", "OFFLINE", "DAMAGED")
-
-        if status not in allowed_statuses:
+        if status not in ("ONLINE", "OFFLINE", "DAMAGED"):
             raise ValueError(f"Invalid module status: {status}")
-
         self.modules[module_name] = status
 
     # =====================================
@@ -158,63 +132,108 @@ class Spaceship:
     def damage_crew(self, member_id, amount):
         if member_id not in self.crew:
             raise ValueError(f"Unknown crew member: {member_id}")
-
         if amount < 0:
             raise ValueError("Damage cannot be negative")
-
         member = self.crew[member_id]
-
-        member["health"] = self.clamp(
-            member["health"] - amount, 0, 100
-        )
+        member["health"] = self.clamp(member["health"] - amount, 0, 100)
 
     def heal_crew(self, member_id, amount):
         if member_id not in self.crew:
             raise ValueError(f"Unknown crew member: {member_id}")
-
         if amount < 0:
             raise ValueError("Healing cannot be negative")
-
         member = self.crew[member_id]
-
-        member["health"] = self.clamp(
-            member["health"] + amount, 0, 100
-        )
+        member["health"] = self.clamp(member["health"] + amount, 0, 100)
 
     def set_heart_rate(self, member_id, bpm):
         if member_id not in self.crew:
             raise ValueError(f"Unknown crew member: {member_id}")
+        self.crew[member_id]["heart_rate"] = self.clamp(bpm, 0, 220)
 
-        self.crew[member_id]["heart_rate"] = self.clamp(
-            bpm, 0, 220
-        )
+    def apply_crew_delta(self, crew_delta):
+        """
+        Применяет эффект сценария к экипажу.
+        crew_delta = {"health": -15, "heart_rate": +25}
+        """
+        if not crew_delta:
+            return
 
-    def update_crew_environment(self):
-        """Игровая реакция экипажа на опасные условия."""
+        health_change = crew_delta.get("health", 0)
+        hr_change = crew_delta.get("heart_rate", 0)
 
-        for member in self.crew.values():
-
+        for member_id, member in self.crew.items():
             if member["health"] <= 0:
                 continue
 
-            # Нехватка кислорода
+            if health_change < 0:
+                self.damage_crew(member_id, -health_change)
+            elif health_change > 0:
+                self.heal_crew(member_id, health_change)
+
+            if hr_change:
+                self.set_heart_rate(
+                    member_id,
+                    member["heart_rate"] + hr_change
+                )
+
+    def update_crew_environment(self):
+        """Реакция экипажа на опасные условия корабля."""
+
+        life_support = self.modules.get("life_support", "ONLINE")
+
+        for member in self.crew.values():
+            if member["health"] <= 0:
+                continue
+
+            # Кислород: <40 — лёгкий урон, <20 — тяжёлый
             if self.oxygen <= 20:
                 member["heart_rate"] = self.clamp(
                     member["heart_rate"] + 15, 0, 220
                 )
-
                 member["health"] = self.clamp(
-                    member["health"] - 5, 0, 100
+                    member["health"] - 8, 0, 100
                 )
-
-            # Опасная температура
-            if self.temperature < 10 or self.temperature > 35:
+            elif self.oxygen <= 40:
                 member["heart_rate"] = self.clamp(
-                    member["heart_rate"] + 10, 0, 220
+                    member["heart_rate"] + 8, 0, 220
+                )
+                member["health"] = self.clamp(
+                    member["health"] - 3, 0, 100
                 )
 
+            # Температура: опасная зона
+            if self.temperature < 5 or self.temperature > 45:
+                member["heart_rate"] = self.clamp(
+                    member["heart_rate"] + 15, 0, 220
+                )
+                member["health"] = self.clamp(
+                    member["health"] - 8, 0, 100
+                )
+            elif self.temperature < 10 or self.temperature > 35:
+                member["heart_rate"] = self.clamp(
+                    member["heart_rate"] + 8, 0, 220
+                )
+                member["health"] = self.clamp(
+                    member["health"] - 3, 0, 100
+                )
+
+            # Корпус: пробоины влияют на экипаж
+            if self.hull_integrity <= 30:
                 member["health"] = self.clamp(
                     member["health"] - 5, 0, 100
+                )
+
+            # Life support offline/damaged
+            if life_support == "OFFLINE":
+                member["health"] = self.clamp(
+                    member["health"] - 6, 0, 100
+                )
+                member["heart_rate"] = self.clamp(
+                    member["heart_rate"] + 12, 0, 220
+                )
+            elif life_support == "DAMAGED":
+                member["health"] = self.clamp(
+                    member["health"] - 2, 0, 100
                 )
 
     # =====================================
@@ -222,8 +241,6 @@ class Spaceship:
     # =====================================
 
     def start_scenario(self, scenario_id):
-        """Устанавливает текущий игровой сценарий."""
-
         self.current_scenario = scenario_id
         self.scenario_completed = False
 
@@ -231,6 +248,4 @@ class Spaceship:
         self.scenario_completed = True
 
     def reset(self):
-        """Полностью восстанавливает корабль и экипаж."""
-
         self.__init__()
