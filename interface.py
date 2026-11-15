@@ -39,7 +39,6 @@ class OrbitTrackApp(QMainWindow):
     def animate_flight(self):
         self.flight_phase += 1
 
-        # 1. Движение звёзд
         for star in self.animated_stars:
             star.moveBy(-1.5, 0)
 
@@ -72,7 +71,6 @@ class OrbitTrackApp(QMainWindow):
             QBrush(QColor(255, 100, 25, flame_alpha))
         )
 
-        # 3. Затухание вспышки столкновения
         if self.impact_flash_opacity > 0:
             self.impact_flash_opacity = max(
                 0,
@@ -143,9 +141,6 @@ class OrbitTrackApp(QMainWindow):
 
         self.connect_to_server()
 
-    # ==========================================
-    # MAIN INTERFACE
-    # ==========================================
 
     def create_interface(self):
 
